@@ -103,7 +103,7 @@ def parse_args():
     parser.add_argument("--paths_file", type=str, default="/eval_files.txt", help="path to the file with input paths") # each line of this file should contain "/path/to/image.ext /path/to/mask.ext /path/to/edge.ext 1 (for fake)/0 (for real)"; for real image.ext, set /path/to/mask.ext and /path/to/edge.ext as a string None
     parser.add_argument('--threshold', type=float, default=0.5)
     parser.add_argument('--model', default='ours', choices=['mvssnet', 'upernet', 'ours'], help='model selection')
-    parser.add_argument('--load_path', type=str, help='path to the pretrained model', default="ckpt/mvssnet.pth")
+    parser.add_argument('--load_path', type=str, help='path to the pretrained model', default="pretrainedModel/10.pth")
     parser.add_argument("--image_size", type=int, default=512, help="size of the images for prediction")
     parser.add_argument("--subsets", nargs='+', type=str, help="evaluation on certain subsets")
     args = parser.parse_args()
@@ -287,9 +287,9 @@ if __name__ == '__main__':
         print("threshold %.4f, img level acc%s: %.4f sen: %.4f  spe: %.4f  f1: %.4f auc: %.4f"
             % (args.threshold, (' (' + ''.join(args.subsets[i]) + ')' if i != len(args.subsets) else ''), acc, sen, spe, f1_imglevel, img_auc))
         print("threshold %.4f, combine f1%s: %.4f" % (args.threshold, (' (' + ''.join(args.subsets[i]) + ')' if i != len(args.subsets) else ''), 2*meanf1*f1_imglevel/(f1_imglevel+meanf1+1e-6)))
-
+        # Todo this is generating error to fix it later on
         # confusion matrix
-        save_path = os.path.join(args.out_dir, 'cm%s_%.4f.png' % (('_' + ''.join(args.subsets[i]) if i != len(args.subsets) else ''), args.threshold))
-        save_cm(y_true, y_pred, save_path)
+        # save_path = os.path.join(args.out_dir, 'cm%s_%.4f.png' % (('_' + ''.join(args.subsets[i]) if i != len(args.subsets) else ''), args.threshold))
+        # save_cm(y_true, y_pred, save_path)
 
     f_csv.close()

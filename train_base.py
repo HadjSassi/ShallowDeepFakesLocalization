@@ -18,15 +18,18 @@ from datasets.dataset import *
 from utils.state import State
 from utils.losses import *
 
+
 # for dice loss
-def dice_loss(out, gt, smooth = 1.0):
+def dice_loss(out, gt, smooth=1.0):
     gt = gt.view(-1)
     out = out.view(-1)
 
     intersection = (gt * out).sum()
-    dice = (2.0 * intersection + smooth) / (torch.square(gt).sum() + torch.square(out).sum() + smooth) # TODO: need to confirm this matches what the paper says, and also the calculation/result is correct
+    dice = (2.0 * intersection + smooth) / (torch.square(gt).sum() + torch.square(
+        out).sum() + smooth)  # TODO: need to confirm this matches what the paper says, and also the calculation/result is correct
 
     return 1.0 - dice
+
 
 # for multiprocessing
 def setup_for_distributed(is_master):
@@ -43,10 +46,12 @@ def setup_for_distributed(is_master):
 
     __builtin__.print = print
 
+
 # for removing damaged images
 def collate_fn(batch):
     batch = list(filter(lambda x: x is not None, batch))
     return torch.utils.data.dataloader.default_collate(batch)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -62,19 +67,22 @@ def parse_args():
     parser.add_argument('--local_rank', default=0, type=int, help='local rank')
 
     parser.add_argument('--state_epoch', default=1, type=int, help='number of epochs to save state')
-    
+
     ## dataset
-    parser.add_argument("--paths_file", type=str, default="/dataset/files.txt", help="path to the file with input paths") # each line of this file should contain "/path/to/image.ext /path/to/mask.ext /path/to/edge.ext 1 (for fake)/0 (for real)"; for real image.ext, set /path/to/mask.ext and /path/to/edge.ext as a string None
+    parser.add_argument("--paths_file", type=str, default="/dataset/files.txt",
+                        help="path to the file with input paths")  # each line of this file should contain "/path/to/image.ext /path/to/mask.ext /path/to/edge.ext 1 (for fake)/0 (for real)"; for real image.ext, set /path/to/mask.ext and /path/to/edge.ext as a string None
     parser.add_argument("--val_paths_file", type=str, help="path to the validation set")
     parser.add_argument("--n_c_samples", type=int, help="samples per classes (None for non-controlled)")
-    parser.add_argument("--val_n_c_samples", type=int, help="samples per classes for validation set (None for non-controlled)")
+    parser.add_argument("--val_n_c_samples", type=int,
+                        help="samples per classes for validation set (None for non-controlled)")
 
     parser.add_argument("--workers", type=int, default=0, help="number of cpu threads to use during batch generation")
 
     parser.add_argument("--image_size", type=int, default=512, help="size of the images")
     parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-    
-    parser.add_argument("--batch_size", type=int, default=12, help="size of the batches") # no default value given by paper
+
+    parser.add_argument("--batch_size", type=int, default=12,
+                        help="size of the batches")  # no default value given by paper
 
     ## model
     parser.add_argument('--model', default='ours', choices=['mvssnet', 'upernet', 'ours'], help='model selection')
@@ -86,9 +94,11 @@ def parse_args():
 
     parser.add_argument('--factor', type=float, default=0.1, help='factor of decay')
 
-    parser.add_argument('--patience', type=int, default=5, help='numbers of epochs to decay for ReduceLROnPlateau scheduler (None to disable)')
+    parser.add_argument('--patience', type=int, default=5,
+                        help='numbers of epochs to decay for ReduceLROnPlateau scheduler (None to disable)')
 
-    parser.add_argument('--decay_epoch', type=int, help='numbers of epochs to decay for StepLR scheduler (low priority, None to disable)')
+    parser.add_argument('--decay_epoch', type=int,
+                        help='numbers of epochs to decay for StepLR scheduler (low priority, None to disable)')
 
     ## training
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
@@ -96,24 +106,25 @@ def parse_args():
     parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
 
     parser.add_argument("--cond_epoch", type=int, default=0, help="epoch to start training from")
-    
+
     parser.add_argument("--n_early", type=int, default=10, help="number of epochs for early stopping")
 
     ## losses
-    parser.add_argument("--lambda_seg", type=float, default=0.16, help="pixel-scale loss weight (alpha)")
-    parser.add_argument("--lambda_clf", type=float, default=0.04, help="image-scale loss weight (beta)")
+    parser.add_argument("--lambda_seg", type=float, default=0.19, help="pixel-scale loss weight (alpha)")
+    parser.add_argument("--lambda_clf", type=float, default=0.03, help="image-scale loss weight (beta)")
 
     ## log
     parser.add_argument("--log_interval", type=int, default=0, help="interval between saving image samples")
     parser.add_argument("--checkpoint_interval", type=int, default=0, help="batch interval between model checkpoints")
-    
+
     args = parser.parse_args()
 
     return args
 
+
 def init_env(args, local_rank, global_rank):
     # for debug only
-    #torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
 
     if (args.id is None):
         args.id = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -126,14 +137,15 @@ def init_env(args, local_rank, global_rank):
 
     return args
 
+
 def init_models(args):
     if (args.model == 'mvssnet'):
         model = get_mvss(backbone='resnet50',
-                            pretrained_base=True,
-                            nclass=1,
-                            constrain=True,
-                            n_input=args.channels,
-                            ).cuda()
+                         pretrained_base=True,
+                         nclass=1,
+                         constrain=True,
+                         n_input=args.channels,
+                         ).cuda()
     elif (args.model == 'upernet'):
         model = EncoderDecoder(n_classes=1, img_size=args.image_size, bayar=False).cuda()
     elif (args.model == 'ours'):
@@ -143,36 +155,40 @@ def init_models(args):
 
     return model
 
-def init_dataset(args, state, global_rank, world_size, val = False):
+
+def init_dataset(args, state, global_rank, world_size, val=False):
     # return None if no validation set provided
     if (val and state.val_paths_file is None):
         print('No val set!')
         return None, None
-    
-    dataset = FakeDataset(global_rank,
-                              (state.paths_file if not val else state.val_paths_file),
-                              args.image_size,
-                              args.id,
-                              (args.n_c_samples if not val else args.val_n_c_samples),
-                              val)
 
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=world_size, rank=global_rank, shuffle=True)
-    
+    dataset = FakeDataset(global_rank,
+                          (state.paths_file if not val else state.val_paths_file),
+                          args.image_size,
+                          args.id,
+                          (args.n_c_samples if not val else args.val_n_c_samples),
+                          val)
+
+    sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=world_size, rank=global_rank,
+                                                              shuffle=True)
+
     local_batch_size = args.batch_size // world_size
-    
+
     if (not val):
         print('Local batch size is {} ({}//{})!'.format(local_batch_size, args.batch_size, world_size))
 
-    dataloader = DataLoader(dataset=dataset, batch_size=local_batch_size, num_workers=args.workers, pin_memory=True, drop_last=True, sampler=sampler, collate_fn=collate_fn)
+    dataloader = DataLoader(dataset=dataset, batch_size=local_batch_size, num_workers=args.workers, pin_memory=True,
+                            drop_last=True, sampler=sampler, collate_fn=collate_fn)
 
     n_drop = len(dataloader.dataset) - len(dataloader) * args.batch_size
-    print('{} set size is {} (drop_last {})!'.format(('Train' if not val else 'Val'), len(dataloader) * args.batch_size, n_drop))
+    print('{} set size is {} (drop_last {})!'.format(('Train' if not val else 'Val'), len(dataloader) * args.batch_size,
+                                                     n_drop))
 
     return sampler, dataloader
 
+
 def init_optims(args, world_size,
                 model):
-    
     # Optimizers
     local_lr = args.lr / world_size
 
@@ -190,29 +206,31 @@ def init_optims(args, world_size,
 
     return optimizer
 
+
 def init_schedulers(args, optimizer):
     lr_scheduler = None
 
     # high priority for ReduceLROnPlateau (validation set required)
     if (args.val_paths_file and args.patience):
         print("Using scheduler ReduceLROnPlateau")
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer = optimizer, 
-                                                                  factor = args.factor,
-                                                                  patience = args.patience)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                                                                  factor=args.factor,
+                                                                  patience=args.patience)
     # low priority StepLR
     elif (args.decay_epoch):
         print("Using scheduler StepLR")
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer = optimizer,
-                                                    step_size = args.decay_epoch,
-                                                    gamma = args.factor)
-    
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,
+                                                       step_size=args.decay_epoch,
+                                                       gamma=args.factor)
+
     else:
         print("No scheduler used")
-    
+
     return lr_scheduler
 
+
 def load_dicts(args,
-                model):
+               model):
     # Load pretrained models
     if args.load_path != None and args.load_path != 'timm':
         print('Load pretrained model: {}'.format(args.load_path))
@@ -221,16 +239,18 @@ def load_dicts(args,
 
     return model
 
+
 # for saving checkpoints
 def save_checkpoints(checkpoint_dir, id, epoch, step, get_module,
-                    model):
+                     model):
     if (get_module):
         net = model.module
     else:
         net = model
 
     torch.save(net.state_dict(),
-                os.path.join(checkpoint_dir, str(id) + "_" + str(epoch) + '_' + str(step) + '.pth'))
+               os.path.join(checkpoint_dir, str(id) + "_" + str(epoch) + '_' + str(step) + '.pth'))
+
 
 # a single step of prediction and loss calculation (same for both training and validating)
 def predict_loss(args, data, model,
@@ -250,7 +270,6 @@ def predict_loss(args, data, model,
         out_edges = torch.sigmoid(out_edges)
         out_masks = torch.sigmoid(out_masks)
 
-        # TODO: GeM from MVSS-Net++
         out_labels = gmp(out_masks).squeeze()
 
     elif (args.model == 'upernet' or args.model == 'ours'):
@@ -259,13 +278,12 @@ def predict_loss(args, data, model,
 
         out_masks = torch.sigmoid(out_masks)
 
-        out_edges = in_edges # dummy output
+        out_edges = in_edges  # dummy output
 
     # Pixel-scale loss
     loss_seg = dice_loss(out_masks, in_masks)
 
     # Edge loss
-    # TODO: is it the same as the paper?
     if (args.model == 'mvssnet'):
         loss_edg = dice_loss(out_edges, in_edges)
     else:
@@ -281,10 +299,11 @@ def predict_loss(args, data, model,
     weighted_loss_seg = alpha * loss_seg
     weighted_loss_clf = beta * loss_clf
     weighted_loss_edg = (1.0 - alpha - beta) * loss_edg
-    
+
     loss = weighted_loss_seg + weighted_loss_clf + weighted_loss_edg
 
     return loss, weighted_loss_seg, weighted_loss_clf, weighted_loss_edg, in_imgs, in_masks, in_edges, out_masks, out_edges
+
 
 def init_early_stopping():
     best_val_loss = float('inf')
@@ -292,6 +311,7 @@ def init_early_stopping():
     early_stopping = False
 
     return best_val_loss, n_last_epochs, early_stopping
+
 
 # elastic
 def load_state(args, global_rank,
@@ -314,25 +334,27 @@ def load_state(args, global_rank,
         print('Load state from {}'.format(state_file))
 
         state.load(state_file, global_rank)
-    
+
     return state, checkpoint_dir
+
 
 def save_state(checkpoint_dir, state):
     # save to tmp, then commit by moving the file in case the job gets interrupted while writing the checkpoint
     state_file = os.path.join(checkpoint_dir, 'state.sta')
     tmp_file = state_file + '.tmp'
-    
+
     torch.save(state.capture_snapshot(), tmp_file)
     move(tmp_file, state_file)
 
     print('State saved for (next) epoch {} in {}'.format(state.epoch, state_file))
 
+
 def train(args, global_rank, world_size, sync, get_module,
-            state, checkpoint_dir,
-            model,
-            train_sampler, dataloader, val_sampler, val_dataloader,
-            optimizer,
-            lr_scheduler):
+          state, checkpoint_dir,
+          model,
+          train_sampler, dataloader, val_sampler, val_dataloader,
+          optimizer,
+          lr_scheduler):
     # Losses that are built-in in PyTorch
     criterion_BCE = nn.BCEWithLogitsLoss().cuda()
     # tensorboard
@@ -368,7 +390,7 @@ def train(args, global_rank, world_size, sync, get_module,
         # ------------------
         #  Train step
         # ------------------
-        with model.join() if get_module else nullcontext(): # get_module indicates using DDP
+        with model.join() if get_module else nullcontext():  # get_module indicates using DDP
             for step, data in enumerate(dataloader):
                 curr_steps = epoch * len(dataloader) + step
 
@@ -378,7 +400,8 @@ def train(args, global_rank, world_size, sync, get_module,
                 optimizer.zero_grad()
 
                 with torch.cuda.amp.autocast():
-                    loss, loss_seg, loss_clf, loss_edg, in_imgs, in_masks, in_edges, out_masks, out_edges = predict_loss(args, data, model, criterion_BCE, gmp)
+                    loss, loss_seg, loss_clf, loss_edg, in_imgs, in_masks, in_edges, out_masks, out_edges = predict_loss(
+                        args, data, model, criterion_BCE, gmp)
 
                 # backward prop
                 scaler.scale(loss).backward()
@@ -390,7 +413,7 @@ def train(args, global_rank, world_size, sync, get_module,
                 epoch_total_clf += loss_clf
                 epoch_total_edg += loss_edg
                 epoch_total_model += loss
-                
+
                 # --------------
                 #  Log Progress (for certain steps)
                 # --------------
@@ -418,13 +441,13 @@ def train(args, global_rank, world_size, sync, get_module,
                 # save model parameters
                 if args.checkpoint_interval != 0 and step % args.checkpoint_interval == 0 and global_rank == 0:
                     save_checkpoints(checkpoint_dir, args.id, epoch, step, get_module,
-                                    model)
+                                     model)
 
         # ------------------
         #  Validation
         # ------------------
         if (val_sampler and val_dataloader):
-  
+
             val_sampler.set_epoch(epoch)
 
             model.eval()
@@ -452,9 +475,9 @@ def train(args, global_rank, world_size, sync, get_module,
 
         if (lr_scheduler):
             if (args.val_paths_file and args.patience):
-                lr_scheduler.step(epoch_val_loss) # ReduceLROnPlateau
+                lr_scheduler.step(epoch_val_loss)  # ReduceLROnPlateau
             elif (args.decay_epoch):
-                lr_scheduler.step() # StepLR
+                lr_scheduler.step()  # StepLR
             else:
                 print("Error in scheduler step")
                 sys.exit()
@@ -504,7 +527,7 @@ def train(args, global_rank, world_size, sync, get_module,
 
             # save model parameters
             if global_rank == 0:
-                save_checkpoints(checkpoint_dir, args.id, epoch, 'end', # set step to a string 'end'
+                save_checkpoints(checkpoint_dir, args.id, epoch, 'end',  # set step to a string 'end'
                                  get_module,
                                  model)
 

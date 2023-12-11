@@ -11,6 +11,7 @@ from train_base import *
 SYNC = False
 GET_MODULE = True
 
+
 def main():
     args = parse_args()
 
@@ -23,15 +24,17 @@ def main():
 
     # Init the process group
     print('Initializing Process Group...')
-    dist.init_process_group(backend=args.dist_backend, init_method=("env://%s:%s" % (args.master_addr, args.master_port)),
-        world_size=world_size, rank=global_rank)
+    dist.init_process_group(backend=args.dist_backend,
+                            init_method=("env://%s:%s" % (args.master_addr, args.master_port)),
+                            world_size=world_size, rank=global_rank)
     print('Process group ready!')
 
     model = init_models(args)
     model = load_dicts(args, model)
-    
+
     # Wrap the model
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank,
+                                                find_unused_parameters=True)
 
     optimizer = init_optims(args, world_size, model)
 
@@ -42,7 +45,7 @@ def main():
                                        model,
                                        optimizer,
                                        lr_scheduler)
-    
+
     model = state.model
     optimizer = state.optimizer
     lr_scheduler = state.scheduler
@@ -55,11 +58,12 @@ def main():
     state.val_paths_file = val_dataloader.dataset.save_path
 
     train(args, global_rank, world_size, SYNC, GET_MODULE,
-            state, checkpoint_dir,
-            model,
-            train_sampler, dataloader, val_sampler, val_dataloader,
-            optimizer,
-            lr_scheduler)
+          state, checkpoint_dir,
+          model,
+          train_sampler, dataloader, val_sampler, val_dataloader,
+          optimizer,
+          lr_scheduler)
+
 
 if __name__ == '__main__':
     main()
